@@ -1,0 +1,86 @@
+version: "3"
+networks:
+  front-net:
+      driver: bridge
+  back-net:
+      driver: bridge
+
+services:
+
+  nginx:
+    build: ./nginx
+    restart: always
+    tty: true
+    depends_on:
+      - wordpress
+    links:
+      - wordpress
+    ports:
+      - 80
+      - 443
+    volumes:
+      - ./nginx/logs:/var/log/nginx
+      - wordpress_data:/var/www/html
+    networks:
+      - back-net
+      - front-net
+    environment: 
+      CLIENT_DOMAIN: ${CLIENT_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+
+  wordpress:
+    build: ./wordpress
+    tty: true
+    ports:
+      - 9000
+    restart: on-failure
+    depends_on:
+      - mariadb
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - back-net
+    environment:
+      WORDPRESS_DB_HOST: mariadb
+      WORDPRESS_DB_USER: mariadb_user
+      WORDPRESS_DB_PASSWORD: mariadb_user_password
+      WORDPRESS_DB_NAME: etna-docker-wordpress
+      CLIENT_DOMAIN: ${CLIENT_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+    links:
+      - mariadb
+
+  mariadb:
+    image: mariadb
+    tty: true
+    restart: always
+    ports:
+      - 3306
+    networks:
+      - back-net
+    environment:
+        MYSQL_DATABASE: etna-docker-wordpress
+        MYSQL_ROOT_PASSWORD: mariadb_password
+        MYSQL_USER: mariadb_user
+        MYSQL_PASSWORD: mariadb_user_password
+    volumes:
+        - mariadb_data:/var/lib/mysql
+
+  haproxy:
+    image: dockercloud/haproxy
+    links:
+      - "nginx:Ynov-social.tp.com"
+    networks:
+      - front-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./haproxy/logs:/var/log/haproxy
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      - BALANCE=static-rr
+
+volumes:
+  mariadb_data:
+  wordpress_data:
